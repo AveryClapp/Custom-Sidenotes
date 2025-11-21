@@ -1,0 +1,53 @@
+/* Footnote references in text */
+.custom-footnote-ref {
+  color: #171717;
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 0 0.125rem;
+  border-radius: 0.125rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-left: 0.1rem;
+}
+
+.custom-footnote-ref:hover {
+  background-color: #f5f5f5;
+  color: #0a0a0a;
+}
+
+/* Sidenotes container */
+.custom-sidenotes-container {
+  position: fixed;
+  right: 2rem;
+  top: 8rem;
+  width: 35%;
+  max-width: 400px;
+  pointer-events: none;
+}
+
+/* Individual sidenotes */
+.custom-sidenote {
+  font-size: 0.875rem;
+  color: #525252;
+  padding: 1rem;
+  margin-bottom: 3rem;
+  line-height: 1.7;
+  pointer-events: auto;
+}
+
+.custom-sidenote .sidenote-number {
+  font-weight: 600;
+  color: #171717;
+}
+
+/* Mobile: stack sidenotes below content */
+@media (max-width: 1024px) {
+  .custom-sidenotes-container {
+    position: static;
+    width: 100%;
+    max-width: 100%;
+    margin-top: 2rem;
+    padding: 1rem;
+    border-top: 1px solid #e5e5e5;
+  }
+}
