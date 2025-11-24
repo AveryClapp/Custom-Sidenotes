@@ -7,6 +7,16 @@ module.exports = class CustomFootnotesPlugin extends Plugin {
     this.registerMarkdownPostProcessor((element, context) => {
       this.processFootnotes(element, context);
     });
+
+    // Handle scroll to reposition sidenotes
+    this.registerDomEvent(window, "scroll", () => {
+      this.updateAllSidenotes();
+    });
+
+    // Handle resize
+    this.registerDomEvent(window, "resize", () => {
+      this.updateAllSidenotes();
+    });
   }
 
   onunload() {
@@ -62,25 +72,29 @@ module.exports = class CustomFootnotesPlugin extends Plugin {
     });
 
     if (allFootnotes.length > 0) {
-      // Wait for DOM to update, then position sidenotes
       setTimeout(() => {
-        this.createSidenotes(element, allFootnotes);
-      }, 10);
+        this.createSidenotes(allFootnotes);
+      }, 100);
     }
   }
 
-  createSidenotes(element, footnotes) {
-    let container = element.querySelector(".custom-sidenotes-container");
+  createSidenotes(footnotes) {
+    // Find the markdown preview view
+    const markdownView = document.querySelector(".markdown-preview-view");
+    if (!markdownView) {
+      console.warn("Could not find markdown preview view");
+      return;
+    }
+
+    // Find or create container
+    let container = markdownView.querySelector(".custom-sidenotes-container");
     if (!container) {
       container = document.createElement("div");
       container.className = "custom-sidenotes-container";
-      element.appendChild(container);
+      markdownView.appendChild(container);
     } else {
-      container.innerHTML = ""; // Clear existing sidenotes
+      container.innerHTML = "";
     }
-
-    // Calculate positions based on reference markers
-    const positions = this.calculateSidenotePositions(footnotes, container);
 
     footnotes.forEach((footnote) => {
       const sidenote = document.createElement("div");
@@ -97,61 +111,41 @@ module.exports = class CustomFootnotesPlugin extends Plugin {
       sidenote.appendChild(noteLabel);
       sidenote.appendChild(noteContent);
 
-      // Position the sidenote
-      const position = positions.get(footnote.id);
-      if (position !== undefined) {
-        sidenote.style.top = `${position}px`;
-      }
-
       container.appendChild(sidenote);
+
+      // Position after adding to DOM
+      requestAnimationFrame(() => {
+        this.positionSidenote(sidenote, footnote.ref);
+      });
     });
   }
 
-  calculateSidenotePositions(footnotes, container) {
-    const positions = new Map();
-    const containerRect = container.getBoundingClientRect();
+  positionSidenote(sidenote, ref) {
+    if (!ref || !ref.getBoundingClientRect) return;
 
-    // Calculate base positions from reference markers
-    const basePositions = footnotes.map((footnote) => {
-      const ref = footnote.ref;
-      if (!ref || !ref.getBoundingClientRect) {
-        return { id: footnote.id, top: 0 };
+    const refRect = ref.getBoundingClientRect();
+
+    // Position relative to viewport since container is fixed
+    // Subtract offset to align better with the reference line
+    const topPosition = refRect.top + window.scrollY - 60;
+
+    sidenote.style.top = `${topPosition}px`;
+  }
+
+  updateAllSidenotes() {
+    const container = document.querySelector(".custom-sidenotes-container");
+    if (!container) return;
+
+    const sidenotes = container.querySelectorAll(".custom-sidenote");
+    sidenotes.forEach((sidenote) => {
+      const noteId = sidenote.getAttribute("data-note-id");
+      const ref = document.querySelector(
+        `.custom-footnote-ref[data-note-id="${noteId}"]`,
+      );
+      if (ref) {
+        this.positionSidenote(sidenote, ref);
       }
-
-      const refRect = ref.getBoundingClientRect();
-      const relativeTop = refRect.top - containerRect.top;
-
-      return {
-        id: footnote.id,
-        originalTop: Math.max(0, relativeTop - 20),
-        finalTop: Math.max(0, relativeTop - 20),
-      };
     });
-
-    // Sort by position
-    basePositions.sort((a, b) => a.originalTop - b.originalTop);
-
-    // Resolve collisions - prevent overlapping
-    const NOTE_HEIGHT = 80; // Estimated height per note
-    const MIN_SPACING = 20;
-
-    for (let i = 1; i < basePositions.length; i++) {
-      const current = basePositions[i];
-      const previous = basePositions[i - 1];
-
-      const requiredTop = previous.finalTop + NOTE_HEIGHT + MIN_SPACING;
-
-      if (current.finalTop < requiredTop) {
-        current.finalTop = requiredTop;
-      }
-    }
-
-    // Apply final positions
-    basePositions.forEach((pos) => {
-      positions.set(pos.id, pos.finalTop);
-    });
-
-    return positions;
   }
 
   getTextNodes(element) {
