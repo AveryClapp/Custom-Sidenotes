@@ -6,169 +6,167 @@ module.exports = class CustomFootnotesPlugin extends Plugin {
 
     this.registerMarkdownPostProcessor((element, context) => {
       this.processFootnotes(element, context);
-    });
+    }, 100);
 
-    // Handle scroll to reposition sidenotes
-    this.registerDomEvent(window, "scroll", () => {
-      this.updateAllSidenotes();
-    });
+    this.registerEvent(
+      this.app.workspace.on("file-open", () => {
+        this.clearAllSidenotes();
+      }),
+    );
 
-    // Handle resize
-    this.registerDomEvent(window, "resize", () => {
-      this.updateAllSidenotes();
-    });
+    this.registerEvent(
+      this.app.workspace.on("layout-change", () => {
+        this.clearAllSidenotes();
+      }),
+    );
   }
 
   onunload() {
     console.log("Unloading Custom Footnotes plugin");
+    this.clearAllSidenotes();
+  }
+
+  clearAllSidenotes() {
+    document.querySelectorAll(".custom-sidenote").forEach((el) => el.remove());
   }
 
   processFootnotes(element, context) {
-    const textNodes = this.getTextNodes(element);
-    const regex = /\^(\d+)\[([^\]]+)\]/g;
-
-    const allFootnotes = [];
-
-    textNodes.forEach((node) => {
-      const text = node.textContent;
-      if (!regex.test(text)) return;
-
-      regex.lastIndex = 0;
-
-      const fragment = document.createDocumentFragment();
-      let lastIndex = 0;
-      let match;
-
-      while ((match = regex.exec(text)) !== null) {
-        const noteNum = match[1];
-        const noteContent = match[2];
-
-        if (match.index > lastIndex) {
-          fragment.appendChild(
-            document.createTextNode(text.slice(lastIndex, match.index)),
-          );
-        }
-
-        const sup = document.createElement("sup");
-        sup.className = "custom-footnote-ref";
-        sup.setAttribute("data-note-id", noteNum);
-        sup.textContent = noteNum;
-        fragment.appendChild(sup);
-
-        allFootnotes.push({
-          id: noteNum,
-          content: noteContent,
-          ref: sup,
-        });
-
-        lastIndex = regex.lastIndex;
-      }
-
-      if (lastIndex < text.length) {
-        fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
-      }
-
-      node.parentNode.replaceChild(fragment, node);
-    });
-
-    if (allFootnotes.length > 0) {
-      setTimeout(() => {
-        this.createSidenotes(allFootnotes);
-      }, 100);
-    }
-  }
-
-  createSidenotes(footnotes) {
-    // Find the markdown preview view
-    const markdownView = document.querySelector(".markdown-preview-view");
-    if (!markdownView) {
-      console.warn("Could not find markdown preview view");
+    if (
+      element.closest(".custom-sidenote") ||
+      element.tagName === "CODE" ||
+      element.tagName === "PRE"
+    ) {
       return;
     }
 
-    // Find or create container
-    let container = markdownView.querySelector(".custom-sidenotes-container");
-    if (!container) {
-      container = document.createElement("div");
-      container.className = "custom-sidenotes-container";
-      markdownView.appendChild(container);
-    } else {
-      container.innerHTML = "";
+    const html = element.innerHTML;
+    if (!html.includes("^")) return;
+
+    const footnotes = [];
+    let newHtml = "";
+    let i = 0;
+
+    while (i < html.length) {
+      if (html[i] === "^") {
+        const remaining = html.slice(i + 1);
+        const digitMatch = remaining.match(/^(\d+)\[/);
+
+        if (digitMatch) {
+          const noteNum = digitMatch[1];
+          const contentStart = i + 1 + digitMatch[0].length;
+
+          let bracketDepth = 1;
+          let contentEnd = contentStart;
+          let inTag = false;
+
+          while (contentEnd < html.length && bracketDepth > 0) {
+            const char = html[contentEnd];
+
+            if (char === "<") {
+              inTag = true;
+            } else if (char === ">") {
+              inTag = false;
+            } else if (!inTag) {
+              if (char === "[") bracketDepth++;
+              else if (char === "]") bracketDepth--;
+            }
+
+            if (bracketDepth > 0) contentEnd++;
+          }
+
+          if (bracketDepth === 0) {
+            const noteContent = html.slice(contentStart, contentEnd);
+
+            newHtml += `<sup class="custom-footnote-ref" data-note-id="${noteNum}">${noteNum}</sup>`;
+
+            footnotes.push({
+              id: noteNum,
+              content: noteContent,
+            });
+
+            i = contentEnd + 1;
+            continue;
+          }
+        }
+      }
+
+      newHtml += html[i];
+      i++;
     }
 
-    footnotes.forEach((footnote) => {
+    if (footnotes.length > 0) {
+      element.innerHTML = newHtml;
+
+      setTimeout(() => {
+        this.createSidenotes(footnotes, context);
+      }, 50);
+    }
+  }
+
+  createSidenotes(footnotes, context) {
+    const sizer = document.querySelector(".markdown-preview-sizer");
+    if (!sizer) {
+      console.warn("Could not find .markdown-preview-sizer");
+      return;
+    }
+
+    for (const footnote of footnotes) {
+      const ref = sizer.querySelector(
+        `.custom-footnote-ref[data-note-id="${footnote.id}"]`,
+      );
+      if (!ref) {
+        console.warn(`Could not find ref for footnote ${footnote.id}`);
+        continue;
+      }
+
+      if (
+        sizer.querySelector(`.custom-sidenote[data-note-id="${footnote.id}"]`)
+      ) {
+        continue;
+      }
+
       const sidenote = document.createElement("div");
       sidenote.className = "custom-sidenote";
       sidenote.setAttribute("data-note-id", footnote.id);
 
       const noteLabel = document.createElement("span");
       noteLabel.className = "sidenote-number";
-      noteLabel.textContent = footnote.id + ". ";
+      noteLabel.textContent = footnote.id;
 
       const noteContent = document.createElement("span");
-      noteContent.textContent = footnote.content;
+      noteContent.className = "sidenote-content";
+      noteContent.innerHTML = footnote.content;
+
+      this.setupLinks(noteContent, context.sourcePath);
 
       sidenote.appendChild(noteLabel);
       sidenote.appendChild(noteContent);
 
-      container.appendChild(sidenote);
+      // Append to sizer
+      sizer.appendChild(sidenote);
 
-      // Position after adding to DOM
-      requestAnimationFrame(() => {
-        this.positionSidenote(sidenote, footnote.ref);
-      });
-    });
-  }
+      // Calculate top position relative to sizer
+      const refRect = ref.getBoundingClientRect();
+      const sizerRect = sizer.getBoundingClientRect();
+      const top = refRect.top - sizerRect.top + sizer.scrollTop;
 
-  positionSidenote(sidenote, ref) {
-    if (!ref || !ref.getBoundingClientRect) return;
-
-    const refRect = ref.getBoundingClientRect();
-
-    // Position relative to viewport since container is fixed
-    // Subtract offset to align better with the reference line
-    const topPosition = refRect.top + window.scrollY - 60;
-
-    sidenote.style.top = `${topPosition}px`;
-  }
-
-  updateAllSidenotes() {
-    const container = document.querySelector(".custom-sidenotes-container");
-    if (!container) return;
-
-    const sidenotes = container.querySelectorAll(".custom-sidenote");
-    sidenotes.forEach((sidenote) => {
-      const noteId = sidenote.getAttribute("data-note-id");
-      const ref = document.querySelector(
-        `.custom-footnote-ref[data-note-id="${noteId}"]`,
-      );
-      if (ref) {
-        this.positionSidenote(sidenote, ref);
-      }
-    });
-  }
-
-  getTextNodes(element) {
-    const textNodes = [];
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
-      acceptNode: (node) => {
-        if (
-          node.parentElement &&
-          (node.parentElement.tagName === "CODE" ||
-            node.parentElement.tagName === "PRE" ||
-            node.parentElement.classList.contains("custom-sidenote"))
-        ) {
-          return NodeFilter.FILTER_REJECT;
-        }
-        return NodeFilter.FILTER_ACCEPT;
-      },
-    });
-
-    let node;
-    while ((node = walker.nextNode())) {
-      textNodes.push(node);
+      sidenote.style.top = `${top}px`;
     }
+  }
 
-    return textNodes;
+  setupLinks(element, sourcePath) {
+    const links = element.querySelectorAll("a.internal-link, a[data-href]");
+    const app = this.app;
+
+    links.forEach((link) => {
+      const href = link.getAttribute("data-href") || link.getAttribute("href");
+      if (!href) return;
+
+      link.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        app.workspace.openLinkText(href, sourcePath, false);
+      };
+    });
   }
 };
