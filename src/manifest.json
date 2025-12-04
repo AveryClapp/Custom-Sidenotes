@@ -1,7 +1,7 @@
 {
   "id": "custom-footnotes",
   "name": "Custom Footnotes",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "minAppVersion": "0.15.0",
   "description": "Parse ^N[content] footnote syntax",
   "author": "Avery Clapp",
