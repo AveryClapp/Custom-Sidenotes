@@ -2,7 +2,6 @@
    READING MODE STYLES
    ============================================ */
 
-/* Force consistent width for reading mode - match portfolio's 55% */
 .markdown-preview-view .markdown-preview-sizer {
   max-width: 55% !important;
   width: 55% !important;
@@ -10,71 +9,87 @@
   margin-right: 0 !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
-}
-
-/* Sidenotes container - positioned in the remaining 45% */
-.markdown-preview-view .custom-sidenotes-container {
-  position: fixed;
-  left: calc(8rem + 55%);
-  top: 0;
-  width: 35%;
-  height: 100vh;
-  padding-left: 2rem;
-  padding-right: 1rem;
-  pointer-events: none;
-  overflow: visible;
+  position: relative !important;
 }
 
 /* Footnote references in text */
 .custom-footnote-ref {
   color: #171717;
   font-weight: 600;
-  font-size: 0.75rem;
-  padding: 0 0.125rem;
+  font-size: 0.7rem;
+  padding: 0 0.1rem;
   border-radius: 0.125rem;
-  cursor: pointer;
-  transition: all 0.15s;
-  margin-left: 0.1rem;
+  margin-left: 0.05rem;
   vertical-align: super;
   line-height: 0;
 }
 
-.custom-footnote-ref:hover {
-  background-color: #f5f5f5;
-  color: #0a0a0a;
-}
-
-/* Individual sidenotes */
+/* Sidenotes - positioned absolutely relative to sizer */
 .custom-sidenote {
   position: absolute;
-  font-size: 0.875rem;
+  left: calc(100% + 1.5rem);
+  width: 180px;
+  font-size: 0.65rem;
   color: #525252;
-  padding: 0.75rem 1rem;
-  line-height: 1.7;
-  pointer-events: auto;
-  width: 75%;
+  line-height: 1.4;
+  display: flex;
+  gap: 0.15rem;
+  align-items: baseline;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .custom-sidenote .sidenote-number {
   font-weight: 600;
   color: #171717;
+  flex-shrink: 0;
+}
+
+.custom-sidenote .sidenote-number::after {
+  content: ".";
+}
+
+.custom-sidenote .sidenote-content {
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.custom-sidenote .sidenote-content p {
+  margin: 0;
+  display: inline;
+}
+
+/* Links inside sidenotes */
+.custom-sidenote a {
+  color: #525252 !important;
+  text-decoration: underline !important;
+  text-decoration-color: #a3a3a3 !important;
+  cursor: pointer !important;
+}
+
+.custom-sidenote a:hover {
+  color: #171717 !important;
+}
+
+.custom-sidenote a.internal-link {
+  text-decoration-style: dotted !important;
 }
 
 /* ============================================
    EDIT MODE STYLES
    ============================================ */
 
-/* Force consistent width for edit mode - match reading mode's 55% */
 .cm-sizer {
-  max-width: 55% !important;
-  width: 55% !important;
+  max-width: 75% !important;
+  width: 75% !important;
   margin-left: 8rem !important;
   margin-right: 0 !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
 }
 
-/* Also target the editor container to ensure consistent positioning */
 .cm-contentContainer {
   padding-left: 0 !important;
 }
@@ -83,33 +98,12 @@
   padding-left: 0 !important;
 }
 
-/* Hide the bracketed content in edit mode */
-.cm-line:has(.cm-formatting-footnote) {
-  position: relative;
-}
-
-/* Style just the ^N part */
-.HyperMD-footnote .cm-formatting-footnote-begin {
-  color: #171717 !important;
-  font-weight: 600 !important;
-  font-size: 0.75rem !important;
-  vertical-align: super !important;
-}
-
-/* Dim the content in brackets */
-.HyperMD-footnote .cm-formatting-footnote,
-.HyperMD-footnote .cm-footnote-content {
-  color: #a3a3a3 !important;
-  opacity: 0.5 !important;
-}
-
 /* ============================================
    MOBILE RESPONSIVE
    ============================================ */
 
 @media (max-width: 1200px) {
-  /* Remove width constraints on smaller screens */
-  .markdown-preview-sizer,
+  .markdown-preview-view .markdown-preview-sizer,
   .cm-sizer {
     max-width: 100% !important;
     width: 100% !important;
@@ -117,19 +111,15 @@
     margin-right: 1rem !important;
   }
 
-  /* Stack sidenotes below content */
-  .custom-sidenotes-container {
-    position: static;
-    width: 100%;
-    max-width: 100%;
-    margin-top: 2rem;
-    padding: 1rem;
-    border-top: 1px solid #e5e5e5;
-    left: auto;
-  }
-
   .custom-sidenote {
-    position: static;
-    margin-bottom: 1.5rem;
+    position: relative !important;
+    left: 0 !important;
+    width: 100% !important;
+    display: block;
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: #f5f5f5;
+    border-radius: 4px;
+    font-size: 0.75rem;
   }
 }
